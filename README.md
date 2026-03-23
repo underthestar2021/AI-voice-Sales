@@ -48,7 +48,7 @@ uv run src/agent.py dev
 
 日志默认写入：
 
-`D:\Worker\LiveKit\log\*.jsonl`
+`../log/*.jsonl`
 
 常见事件包括：
 
