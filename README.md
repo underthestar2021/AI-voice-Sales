@@ -1,4 +1,4 @@
-# 🎙️ my-agent
+# 🎙️ LiveKit-Voice-Agent
 
 一个基于 **LiveKit Agents** 的中文语音助手项目，面向电话语音场景，支持实时 STT、LLM 推理和 TTS 播报，并内置完整延迟指标日志。
 
