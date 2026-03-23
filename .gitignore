@@ -33,6 +33,4 @@ KMS
 .github/personal-instructions.md
 
 # RAG
-data/rag_index/
-docs/
 log/

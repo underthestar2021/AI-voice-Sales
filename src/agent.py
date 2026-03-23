@@ -11,12 +11,11 @@ from livekit.agents import (
     AgentServer,
     AgentSession,
     JobContext,
-    JobProcess,
     cli,
     room_io,
 )
 from livekit.agents.metrics import EOUMetrics, LLMMetrics, STTMetrics, TTSMetrics
-from livekit.plugins import minimax, openai, silero, volcengine
+from livekit.plugins import minimax, openai, volcengine
 
 from assistant import Assistant
 from metrics_logger import MetricsLogger
@@ -27,41 +26,6 @@ load_dotenv(".env.local")
 
 server = AgentServer()
 METRICS_LOG_DIR = Path(__file__).resolve().parents[2] / "log"
-
-
-def _env_float(name: str, default: float) -> float:
-    '''从环境变量读取浮点数配置，失败时返回默认值。'''
-    raw = os.getenv(name)
-    if raw is None or raw == "":
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        return default
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    '''从环境变量读取布尔配置，失败时返回默认值。'''
-    raw = os.getenv(name)
-    if raw is None or raw == "":
-        return default
-    return raw.strip().lower() in ("1", "true", "yes", "on")
-
-
-def prewarm(proc: JobProcess) -> None:
-    '''在 Worker 启动阶段预加载 VAD 模型，降低首轮延迟。'''
-    proc.userdata["vad"] = silero.VAD.load(
-        min_speech_duration=0.04,
-        min_silence_duration=0.22,
-        activation_threshold=0.55,
-        deactivation_threshold=0.45,
-        prefix_padding_duration=0.25,
-        max_buffered_speech=20.0,
-        sample_rate=16000,
-    )
-
-
-server.setup_fnc = prewarm
 
 
 async def _probe_tcp_rtt(host: str, port: int, timeout_s: float = 2.0) -> float | None:
@@ -75,7 +39,6 @@ async def _probe_tcp_rtt(host: str, port: int, timeout_s: float = 2.0) -> float 
         return (time.perf_counter() - start) * 1000.0
     except Exception:
         return None
-
 
 
 @server.rtc_session(agent_name="my-agent")
@@ -92,8 +55,6 @@ async def my_agent(ctx: JobContext) -> None:
     )
 
     logger.warning("stt backend fixed", extra={"backend": "volcengine"})
-
-    # LLM: Ollama via OpenAI-compatible API (fixed no-think)
 
     session = AgentSession(
         stt=volcengine.BigModelSTT(
@@ -112,29 +73,19 @@ async def my_agent(ctx: JobContext) -> None:
         #     model="./qwen",
         #     base_url="http://127.0.0.1:8000/v1",
         #     api_key="fake-key",
-
         # ),
-
         llm=openai.LLM(
             model="qwen-flash",
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-            api_key=os.getenv("DASHSCOPE_API_KEY")
+            api_key=os.getenv("DASHSCOPE_API_KEY"),
         ),
-
-        tts=(_tts := minimax.TTS(
-    model="speech-02-turbo",  # 低延迟模型
-    voice="socialmedia_female_1_v1",  # 客服常用音色
-    api_key=os.getenv("MINIMAX_API_KEY"),
-    base_url="https://api.minimax.chat",  # 国内 API 地址
-    speed=1.05,  # 加快语速以降低总时长
-    # emotion="neutral",  # 保持中性情绪，适合客服场景
-)),
-        # tts = MeloTTS(
-        #     language="ZH",
-        #     speaker=None,   # None 表示使用该语言下第一个可用音色
-        #     speed=1.1,
-        #     device="cpu",  # 或 "cpu"
-        # ),
+        tts=minimax.TTS(
+            model="speech-02-turbo",
+            voice="socialmedia_female_1_v1",
+            api_key=os.getenv("MINIMAX_API_KEY"),
+            base_url="https://api.minimax.chat",
+            speed=1.05,
+        ),
         preemptive_generation=True,
         min_interruption_duration=0.2,
         min_endpointing_delay=0.0,
@@ -205,9 +156,6 @@ async def my_agent(ctx: JobContext) -> None:
         if not transcript:
             return
 
-        # Interim-first strategy:
-        # 1) push interim updates immediately for low-latency UI display
-        # 2) when final arrives, treat it as backfill/confirmation
         is_final = bool(getattr(ev, "is_final", False))
         if not is_final:
             if transcript != last_interim_text:

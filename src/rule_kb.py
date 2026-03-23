@@ -182,17 +182,6 @@ def match_rules(user_text: str, *, max_hits: int = 2) -> list[RuleHit]:
     return hits
 
 
-def build_injected_knowledge_prompt(hits: list[RuleHit]) -> str:
-    if not hits:
-        return ""
-
-    lines = ["以下是本轮对话可参考的合规要点，请自然融入回答："]
-    for idx, hit in enumerate(hits, start=1):
-        lines.append(f"{idx}. {hit.knowledge}")
-    lines.append("回答保持口语化，避免机械复述。")
-    return "\n".join(lines)
-
-
 def build_user_context_block(hits: list[RuleHit]) -> str:
     if not hits:
         return ""
@@ -202,4 +191,3 @@ def build_user_context_block(hits: list[RuleHit]) -> str:
         lines.append(f"- {hit.knowledge}")
     lines.append("[请自然融入以上要点后再回答]")
     return "\n".join(lines)
-

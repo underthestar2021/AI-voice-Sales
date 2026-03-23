@@ -2,8 +2,9 @@ import logging
 from collections.abc import AsyncIterable
 
 from livekit.agents import Agent, llm
-from rule_kb import build_user_context_block, match_rules
 from prompt import PROMPT
+from rule_kb import build_user_context_block, match_rules
+
 logger = logging.getLogger("agent")
 
 
