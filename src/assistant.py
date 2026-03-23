@@ -10,6 +10,7 @@ logger = logging.getLogger("agent")
 
 class Assistant(Agent):
     def __init__(self) -> None:
+        '''初始化保险顾问智能体，并加载系统提示词与规则缓存。'''
         self._turn_index = 0
         self._rule_context_block = ""
         super().__init__(
@@ -19,6 +20,7 @@ class Assistant(Agent):
     async def on_user_turn_completed(
         self, turn_ctx: llm.ChatContext, new_message: llm.ChatMessage
     ) -> None:
+        '''在用户一轮说完后更新规则命中缓存，供下一轮回复注入参考知识。'''
         self._turn_index += 1
         user_text = (new_message.text_content or "").strip()
         hits = match_rules(user_text, max_hits=2) if user_text else []
@@ -31,6 +33,7 @@ class Assistant(Agent):
 
     @staticmethod
     def _latest_user_text(chat_ctx: llm.ChatContext) -> str:
+        '''从会话上下文中提取最近一条用户文本，兼容 messages 属性或方法。'''
         msgs = getattr(chat_ctx, "messages", [])
         if callable(msgs):
             msgs = msgs()
@@ -46,6 +49,7 @@ class Assistant(Agent):
         tools: list[llm.Tool],
         model_settings,
     ) -> AsyncIterable[llm.ChatChunk | str]:
+        '''在调用底层 LLM 前注入规则知识块，并按流式方式返回模型输出。'''
         run_ctx = chat_ctx
         # Recompute rule hit from latest chat context to avoid stale/missed cache.
         latest_user_text = self._latest_user_text(chat_ctx)
@@ -63,6 +67,7 @@ class Assistant(Agent):
             run_ctx.add_message(role="system", content=block)
 
         async def _stream() -> AsyncIterable[llm.ChatChunk | str]:
+            '''代理默认 llm_node 的流式结果，保持外部调用接口不变。'''
             async for chunk in Agent.default.llm_node(self, run_ctx, tools, model_settings):
                 yield chunk
 

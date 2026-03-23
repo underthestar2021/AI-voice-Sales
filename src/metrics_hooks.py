@@ -12,6 +12,8 @@ from metrics_logger import MetricsLogger
 
 @dataclass
 class MetricsState:
+    '''维护指标采集过程中需要跨事件共享的会话状态。'''
+
     last_user_created_at: float | None = None
     last_user_stop_at: float | None = None
     last_interim_text: str = ""
@@ -24,11 +26,11 @@ def register_session_metrics_hooks(
     metrics_logger: MetricsLogger,
     state: MetricsState,
 ) -> None:
-    '''注册会话级指标回调并统一写入日志文件。'''
+    '''注册会话级指标回调，统一收集并写入转写与时延日志。'''
 
     @session.on("conversation_item_added")
     def _on_conversation_item_added(ev: Any) -> None:
-        '''记录用户到 AI 首音频的端到端延迟。'''
+        '''记录用户消息到助手首音频开始的端到端时延。'''
         item = getattr(ev, "item", None)
         if item is None or getattr(item, "type", None) != "message":
             return
@@ -54,7 +56,7 @@ def register_session_metrics_hooks(
 
     @session.on("user_state_changed")
     def _on_user_state_changed(ev: Any) -> None:
-        '''在用户停说时记录时间锚点。'''
+        '''在用户从 speaking 切换到 listening 时记录停说时间锚点。'''
         if (
             getattr(ev, "old_state", None) == "speaking"
             and getattr(ev, "new_state", None) == "listening"
@@ -63,7 +65,7 @@ def register_session_metrics_hooks(
 
     @session.on("user_input_transcribed")
     def _on_user_input_transcribed(ev: Any) -> None:
-        '''记录 interim/final 转写并计算 STT final 延迟。'''
+        '''记录 interim/final 转写，并计算停说到 final 的收敛耗时。'''
         transcript = str(getattr(ev, "transcript", "") or "").strip()
         if not transcript:
             return
@@ -106,7 +108,7 @@ def register_session_metrics_hooks(
 
     @session.on("metrics_collected")
     def _on_metrics(ev: Any) -> None:
-        '''统一处理 EOU/LLM/TTS/STT 指标。'''
+        '''统一处理 LiveKit 上报的 EOU/LLM/TTS/STT 指标。'''
         m = getattr(ev, "metrics", None)
         if m is None:
             return
@@ -174,7 +176,7 @@ def start_network_probe_task(
     metrics_logger: MetricsLogger,
     interval_s: float = 5.0,
 ) -> asyncio.Task[None] | None:
-    '''启动网络探针任务，周期写入 latency.network_probe。'''
+    '''启动网络探针后台任务，周期写入 latency.network_probe。'''
     parsed = urlparse(livekit_url)
     probe_host = parsed.hostname
     if not probe_host:
@@ -188,6 +190,7 @@ def start_network_probe_task(
         probe_port = 80
 
     async def _network_probe_loop() -> None:
+        '''循环执行 TCP 探测并刷新最近网络 RTT。'''
         while True:
             rtt = await probe_tcp_rtt(probe_host, probe_port, timeout_s=2.0)
             state.last_tcp_rtt_ms = rtt
