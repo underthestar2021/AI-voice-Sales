@@ -1,34 +1,68 @@
-from livekit.agents import Agent, llm
+import logging
+from collections.abc import AsyncIterable
 
-from rag.retriever import Retriever
+from livekit.agents import Agent, llm
+from rule_kb import build_user_context_block, match_rules
+from prompt import PROMPT
+logger = logging.getLogger("agent")
 
 
 class Assistant(Agent):
-    def __init__(self, retriever: Retriever | None = None) -> None:
+    def __init__(self) -> None:
+        self._turn_index = 0
+        self._rule_context_block = ""
         super().__init__(
-            instructions="""你是一位专业的保险顾问语音助手，用户通过语音与你交流。
-            你熟悉蓝医保、蓝鲸1号等太保互联网保险产品，能够准确解答产品保障内容、投保条件、理赔流程等问题。
-            回答时始终使用简短自然的中文口语句子，便于语音合成和用户打断。
-            第一句话必须极短，最好4到8个汉字，立即说出。
-            后续每个分句通常6到16个汉字。
-            使用正常口语标点（逗号、句号、问号、感叹号）制造清晰停顿。
-            对于较长的回答，先说一句简短的引子，再逐句展开。
-            不要以长句、大段铺垫或整段话开头。
-            不使用表情符号、Markdown、列表符号等特殊格式。
-            如果检索到相关资料，优先基于资料回答；如果资料不足，如实说明并用自身知识补充。
-            你热情友好，有耐心，善于用通俗语言解释复杂的保险条款。""",
+            instructions=PROMPT,
         )
-        self._retriever = retriever
 
     async def on_user_turn_completed(
         self, turn_ctx: llm.ChatContext, new_message: llm.ChatMessage
     ) -> None:
-        if self._retriever is None:
-            return
-        query = new_message.text_content()
-        context = await self._retriever.search(query)
-        if context:
-            turn_ctx.add_message(
-                role="system",
-                content=f"以下是从知识库中检索到的相关资料，请优先基于此作答：\n\n{context}",
+        self._turn_index += 1
+        user_text = (new_message.text_content or "").strip()
+        hits = match_rules(user_text, max_hits=2) if user_text else []
+        self._rule_context_block = build_user_context_block(hits) if hits else ""
+        if hits:
+            logger.info(
+                "rule_kb.hit.on_user_turn_completed",
+                extra={"rule_ids": [h.rule_id for h in hits], "user_text": user_text},
             )
+
+    @staticmethod
+    def _latest_user_text(chat_ctx: llm.ChatContext) -> str:
+        msgs = getattr(chat_ctx, "messages", [])
+        if callable(msgs):
+            msgs = msgs()
+        msg_list = list(msgs or [])
+        for msg in reversed(msg_list):
+            if getattr(msg, "role", None) == "user":
+                return (msg.text_content or "").strip()
+        return ""
+
+    def llm_node(
+        self,
+        chat_ctx: llm.ChatContext,
+        tools: list[llm.Tool],
+        model_settings,
+    ) -> AsyncIterable[llm.ChatChunk | str]:
+        run_ctx = chat_ctx
+        # Recompute rule hit from latest chat context to avoid stale/missed cache.
+        latest_user_text = self._latest_user_text(chat_ctx)
+        hits = match_rules(latest_user_text, max_hits=2) if latest_user_text else []
+        block = build_user_context_block(hits) if hits else self._rule_context_block
+
+        if hits:
+            logger.info(
+                "rule_kb.hit.llm_node",
+                extra={"rule_ids": [h.rule_id for h in hits], "user_text": latest_user_text},
+            )
+
+        if block:
+            run_ctx = chat_ctx.copy()
+            run_ctx.add_message(role="system", content=block)
+
+        async def _stream() -> AsyncIterable[llm.ChatChunk | str]:
+            async for chunk in Agent.default.llm_node(self, run_ctx, tools, model_settings):
+                yield chunk
+
+        return _stream()
