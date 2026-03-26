@@ -137,7 +137,7 @@ ws://127.0.0.1:8001/ws
 示例：
 
 ```env
-QWEN_STREAMING_STT_WS_URL=ws://8.141.21.41:8001/ws
+QWEN_STREAMING_STT_WS_URL=ws://<asr-host>:8001/ws
 ```
 
 如果 Agent 和 ASR 服务在同一台机器，建议优先使用：
