@@ -7,7 +7,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from livekit.agents import AgentServer, AgentSession, JobContext, cli, room_io
-from livekit.plugins import minimax, openai, silero
+from livekit.plugins import minimax, openai, silero,volcengine
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = ROOT_DIR / "qwen-livekit-stt"
@@ -53,16 +53,31 @@ async def my_agent(ctx: JobContext) -> None:
         "stt backend fixed",
         extra={"backend": "qwen_streaming_ws", "ws_url": qwen_streaming_ws_url},
     )
+    llm_model = os.getenv("LLM_MODEL", "./qwen/qwen2.5-7b/")
+    llm_base_url = os.getenv("LLM_BASE_URL", "http://8.141.21.41:8000/v1")
+    llm_api_key = os.getenv("LLM_API_KEY", "fake-key")
 
     session = AgentSession(
-        stt=QwenStreamingSTT(
-            ws_url=qwen_streaming_ws_url,
-            model=os.getenv("QWEN_STREAMING_STT_MODEL", "qwen3-asr-streaming"),
+        # stt=QwenStreamingSTT(
+        #     ws_url=qwen_streaming_ws_url,
+        #     model=os.getenv("QWEN_STREAMING_STT_MODEL", "qwen3-asr-streaming"),
+        # ),
+        stt=volcengine.BigModelSTT(
+            app_id=os.getenv("VOLCENGINE_STT_APP_ID", ""),
+            access_token=os.getenv("VOLCENGINE_STT_ACCESS_TOKEN"),
+            model_name=os.getenv("VOLCENGINE_BIGMODEL_STT_MODEL", "bigmodel"),
+            enable_itn=False,
+            enable_punc=False,
+            enable_ddc=False,
+            vad_segment_duration=1200,
+            end_window_size=240,
+            force_to_speech_time=1000,
+            interim_results=True,
         ),
         llm=openai.LLM(
-            model="qwen-flash",
-            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
-            api_key=os.getenv("DASHSCOPE_API_KEY"),
+            model=llm_model,
+            base_url=llm_base_url,
+            api_key=llm_api_key,
         ),
         tts=minimax.TTS(
             model="speech-02-turbo",
