@@ -1,0 +1,15 @@
+[project]
+name = "qwen-asr-streaming-service"
+version = "0.1.0"
+description = "Qwen3-ASR streaming websocket service for LiveKit integration"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "numpy>=1.26.0",
+    "qwen-asr[vllm]>=0.1.0",
+    "uvicorn>=0.34.0",
+]
+
+[tool.uv]
+package = false
+
