@@ -22,7 +22,7 @@
 
 `LiveKit Server` 部署文档：
 
-- [`docs/LiveKit-Server部署.md`](D:/Worker/LiveKit/my-agent/docs/LiveKit-Server部署.md)
+- [`docs/LiveKit-Server部署.md`](./docs/LiveKit-Server部署.md)
 
 ---
 
@@ -82,7 +82,7 @@
 
 参考文档：
 
-- [`docs/LiveKit-Server部署.md`](D:/Worker/LiveKit/my-agent/docs/LiveKit-Server部署.md)
+- [`docs/LiveKit-Server部署.md`](./docs/LiveKit-Server部署.md)
 
 ### 3.2 再准备前端
 
@@ -128,7 +128,7 @@ MINIMAX_API_KEY=
 
 环境变量模板见：
 
-- [`.env.example`](D:/Worker/LiveKit/my-agent/.env.example)
+- [`.env.example`](./.env.example)
 
 ### 3.4 安装依赖
 
@@ -167,7 +167,7 @@ uv run src/agent_Online.py dev
 
 入口文件：
 
-- [`src/agent_Online.py`](D:/Worker/LiveKit/my-agent/src/agent_Online.py)
+- [`src/agent_Online.py`](./src/agent_Online.py)
 
 ### Local 版当前默认链路
 
@@ -177,11 +177,12 @@ uv run src/agent_Online.py dev
 
 入口文件：
 
-- [`src/agent_Local.py`](D:/Worker/LiveKit/my-agent/src/agent_Local.py)
+- [`src/agent_Local.py`](./src/agent_Local.py)
 
 另外，仓库里已经有独立的 Qwen TTS 服务：
 
-- [`qwen-tts-service/server.py`](D:/Worker/LiveKit/my-agent/qwen-tts-service/server.py)
+- [`qwen-tts-service/server.py`](./qwen-tts-service/server.py)
+- [`qwen-tts-service/README.md`](./qwen-tts-service/README.md)
 
 但它**还没有正式接入当前 agent 的默认 TTS 链路**。
 
@@ -207,6 +208,12 @@ uv run src/agent_Online.py dev
 - `Qwen ASR` 服务
 - `Qwen2.5-7B-Instruct` 的 vLLM 服务
 - 如果后续切 Qwen TTS，还要准备 `Qwen3-TTS` 服务
+
+相关参考：
+
+- [`docs/LLM部署.md`](./docs/LLM部署.md)
+- [`qwen-asr-streaming-service/README.md`](./qwen-asr-streaming-service/README.md)
+- [`qwen-tts-service/README.md`](./qwen-tts-service/README.md)
 
 而且你通常还需要继续调：
 
@@ -292,6 +299,12 @@ GPU 服务器建议运行：
 - `Nginx / 反向代理`
 
 ### 6.3 GPU 服务启动参考
+
+更多说明见：
+
+- [`docs/LLM部署.md`](./docs/LLM部署.md)
+- [`qwen-asr-streaming-service/README.md`](./qwen-asr-streaming-service/README.md)
+- [`qwen-tts-service/README.md`](./qwen-tts-service/README.md)
 
 Qwen2.5-7B-Instruct：
 
@@ -381,8 +394,8 @@ my-agent/
 
 ## 9️⃣ 相关文档
 
-- [`docs/LiveKit-Server部署.md`](D:/Worker/LiveKit/my-agent/docs/LiveKit-Server部署.md)
-- [`docs/LLM部署.md`](D:/Worker/LiveKit/my-agent/docs/LLM部署.md)
-- [`docs/系统架构与数据流.md`](D:/Worker/LiveKit/my-agent/docs/系统架构与数据流.md)
-- [`qwen-asr-streaming-service/README.md`](D:/Worker/LiveKit/my-agent/qwen-asr-streaming-service/README.md)
-- [`qwen-tts-service/README.md`](D:/Worker/LiveKit/my-agent/qwen-tts-service/README.md)
+- [`docs/LiveKit-Server部署.md`](./docs/LiveKit-Server部署.md)
+- [`docs/LLM部署.md`](./docs/LLM部署.md)
+- [`docs/系统架构与数据流.md`](./docs/系统架构与数据流.md)
+- [`qwen-asr-streaming-service/README.md`](./qwen-asr-streaming-service/README.md)
+- [`qwen-tts-service/README.md`](./qwen-tts-service/README.md)
