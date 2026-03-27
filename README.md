@@ -17,7 +17,10 @@
 - **普通服务器** 运行 `LiveKit Server`、`Agent`
 - **GPU 服务器** 运行 `Qwen ASR`、`Qwen2.5-7B-Instruct`、`Qwen3-TTS-CustomVoice`
 
-也就是说，**在线部署优先**，本地版本主要用于联调和开发。
+也就是说：
+
+- **Online 版** 是默认可直接跑的版本
+- **Local 版** 追求更低延迟，但不是开箱即用版本，需要先把模型服务部署完整，再做参数联调
 
 ---
 
@@ -25,23 +28,43 @@
 
 ### 🌐 Online 版
 
-这是推荐优先启动的版本，适合正式环境、联调环境、云服务器部署。
+这是当前**默认可直接跑**的版本，也是推荐优先启动的版本，适合正式环境、演示环境、联调环境。
 
 - `LiveKit Server` 放在普通服务器
 - `Agent` 放在普通服务器
-- `ASR / LLM / TTS` 放在 GPU 服务器
-- Agent 通过 HTTP / WebSocket 去调用远端推理服务
+- `ASR / LLM / TTS` 使用已经可用的线上服务
+- Agent 直接通过 HTTP / WebSocket 去调用这些服务
 
-这也是当前文档里默认推荐的启动方式。
+特点：
+
+- 配置好密钥和地址后，可以直接启动
+- 不需要你先自己把整套模型服务部署起来
+- 适合先验证整条链路是否跑通
+
+这也是当前仓库默认推荐的启动方式。
 
 ### 💻 Local 版
 
-这是开发机本地调试版，适合本机联调、排查问题、快速试跑。
+这不是“纯开发版”，而是**偏低延迟的自部署版**。它的目标是把核心推理链路切到你自己的模型服务上，从而获得更低延迟和更强可控性。
 
-- `Agent` 在本地启动
-- `LiveKit Server` 可以连线上，也可以连你自己的测试环境
-- `ASR / LLM / TTS` 可以继续走远端 GPU 服务
-- 不建议把 `Qwen ASR / Qwen2.5-7B / Qwen3-TTS-1.7B` 全放本地 CPU 跑正式实时链路
+但要明确：
+
+- `Local` **不能直接跑通**
+- 你必须先部署好自己的 `ASR / LLM / TTS` 服务
+- 你还需要自己调 `VAD / endpointing / 中断 / 模型参数 / 服务地址`
+
+也就是说，`Local` 更像是“低延迟自部署链路入口”，不是“打开命令就能直接用”的版本。
+
+典型前置条件：
+
+- `Agent` 在本地或普通服务器启动
+- `LiveKit Server` 已可用
+- `Qwen ASR` 服务已部署
+- `Qwen2.5-7B-Instruct` 的 vLLM 服务已部署
+- `Qwen3-TTS-CustomVoice` 服务已部署
+- `.env.local` 已经改成你自己的服务地址
+
+如果这些前置条件没准备好，`Local` 版本通常是跑不通的。
 
 ---
 
@@ -112,12 +135,21 @@
 ### ✅ Online 版推荐顺序
 
 1. 启动 `LiveKit Server`
-2. 在 GPU 服务器启动 `qwen2.5-7b-instruct` 的 vLLM 服务
-3. 在 GPU 服务器启动 `qwen-asr-streaming-service`
-4. 在 GPU 服务器启动 `qwen-tts-service`
-5. 在普通服务器启动 Agent
+2. 确认在线 `ASR / LLM / TTS` 服务地址和密钥可用
+3. 在普通服务器或本机启动 Agent
 
-如果只是联调，至少也建议先把 **LLM / ASR** 起好，再启动 Agent。
+这个版本的重点是：**服务侧已经准备好，所以 Agent 可以直接启动验证链路。**
+
+### ⚙️ Local 版推荐顺序
+
+1. 先部署 `Qwen2.5-7B-Instruct` 的 vLLM 服务
+2. 再部署 `qwen-asr-streaming-service`
+3. 再部署 `qwen-tts-service`
+4. 修改 `.env.local`，把地址指到你自己的服务
+5. 根据实际效果调 `VAD / endpointing / interruption` 等参数
+6. 最后再启动 Agent
+
+这个版本的重点是：**先把模型服务和参数调到可用，再谈低延迟。**
 
 ---
 
@@ -211,28 +243,36 @@ uv run qwen-tts-service/server.py \
 
 #### Online 部署形态
 
-如果是线上部署，推荐把 Agent 放在普通服务器，连接远端 GPU 推理服务。
+如果你要的是“先跑通”，优先用 Online 版。它的特点不是最低延迟，而是**可以直接跑**。
 
 当前仓库里需要区分两件事：
 
 - [`src/agent_Online.py`](./src/agent_Online.py) 是历史线上入口，仍保留旧版云厂商配置
 - [`src/agent_Local.py`](./src/agent_Local.py) 才是当前已经切到 `Qwen ASR + qwen2.5-7b-instruct` 的入口
 
-所以如果你要跑当前推荐的 **Qwen 自部署链路**，实际应该优先参考：
+如果你只是先验证 Agent 能不能正常工作，优先跑：
+
+```bash
+uv run src/agent_Online.py dev
+```
+
+#### Local 自部署形态
+
+如果你要的是更低延迟、更强控制权、或者后续准备把整条链路自托管，再使用 Local 版。
+
+但这个入口不是直接可用入口，它依赖你先把自部署服务全部起好。当前仓库里，自部署链路入口是：
 
 ```bash
 uv run src/agent_Local.py dev
 ```
 
-然后把 `.env.local` 配成远端 GPU 服务地址。
+启动前至少要保证：
 
-#### Local 开发形态
+- `QWEN_STREAMING_STT_WS_URL` 可连通
+- `LLM_BASE_URL` 可连通
+- 如果后续切 Qwen TTS，还要保证 TTS 服务可连通
 
-本地开发直接启动：
-
-```bash
-uv run src/agent_Local.py dev
-```
+否则 `Local` 不应被视为“直接运行入口”。
 
 ---
 
